@@ -88,7 +88,7 @@ colnames(trna_stats) <- c("id","trna")
 genome_stats <- read_table("../Pre-processed_Files/ref.nature.DAGPD.genome.stats2.txt", col_names = FALSE)
 colnames(genome_stats) <- c("id","length","GC")
 genome_stats2<- genome_stats %>% select("id","length") %>% mutate(size=case_when(
-                                                                 length >=200000 & length<250000~"250kb",
+                                                                 length >=100000 & length<250000~"250kb",
                                                                  length >=250000 & length<300000~"300kb",
                                                                  length >=300000 & length<350000~"350kb",
                                                                  length >=350000 & length<400000~"400kb",
