@@ -9,7 +9,7 @@ format:
 # Host assignment and host-linked phage abundance for domestic animal gut phage
 
 ```{r,message=FALSE,warning=FALSE}
-setwd("~/Downloads/DAGPD/cell/Scripts")
+# setwd("~/Downloads/DAGPD/cell/Scripts")
 library(tidyverse)
 source("./theme_llm.R")
 
