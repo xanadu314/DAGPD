@@ -11,7 +11,7 @@ format:
 ## GC content of crAss-like phages alpha group
 
 ```{r,warning=FALSE,message=FALSE}
-setwd("~/Downloads/DAGPD/cell/Scripts")
+# setwd("~/Downloads/DAGPD/cell/Scripts")
 library(tidyverse)
 source("./theme_llm.R")
 theme_set(theme_llm(base_size = 16,legend = "none"))
