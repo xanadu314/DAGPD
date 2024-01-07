@@ -44,3 +44,8 @@ Huge phage annotation and tRNA annotation
 
 #### 10 crAss phage annotation
 CrAss-like phages annotation by blastp and hmmer and Evolution analysis.
+
+## Overview of Scripts
+
+The main figures drawing scripts of metagenome and virome analysis are placed in [Scripts](https://github.com/xanadu314/DAGPD/tree/main/Scripts).
+The reproducible R scripts in qmd and html files were provided.
