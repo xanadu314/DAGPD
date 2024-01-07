@@ -10,7 +10,7 @@ format:
 
 ## Barplot showing the basic annotation of DAGPDs
 ```{r,warning=FALSE,message=FALSE}
-setwd("~/Downloads/DAGPD/cell/Scripts")
+# setwd("~/Downloads/DAGPD/cell/Scripts")
 library(tidyverse)
 # read annotation results
 data1 <- read.table("../Pre-processed_Files/column_plot.txt",header = T)
