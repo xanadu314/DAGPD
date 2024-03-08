@@ -17,5 +17,5 @@ done<id.txt
 ## QC step3: Generate Reports
 while read id
 do
-    fastp -i ${id}_clean2.1.gz -I ${id}clena2.2.gz -o ${id}_1.clean2.fastq.gz -O ${id}_2.clean2.fastq.gz -j ${id}.fastp_final.josn -h ${id}.fastp_final.html
+    fastp -i ${id}_clean2.1.gz -I ${id}clena2.2.gz -o ${id}_1.clean2.fastq.gz -O ${id}_2.clean2.fastq.gz -j ${id}.fastp.final.json -h ${id}.fastp.final.html
 done<id.txt
