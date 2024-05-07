@@ -1,0 +1,250 @@
+---
+title: "DAGPD: Host assignment and host-linked phage abundance for domestic animal gut phage"
+author: "Yuxuan Huang"
+format: 
+  html:
+    embed-resources: true
+---
+
+# Host assignment and host-linked phage abundance for domestic animal gut phage
+
+```{r,message=FALSE,warning=FALSE}
+setwd("~/Downloads/DAGPD/cell/Scripts")
+library(tidyverse)
+source("./theme_llm.R")
+
+host <- read.table("../Pre-processed_Files/hosts1003.txt",header = T,sep="\t")
+host$Hosts <- factor(host$Hosts,levels = unique(host$Hosts))
+host$Species <- factor(host$Species,levels = c("sum","Chicken", "Pig", "Ruminant","Human"))
+host$Phylum <- factor(host$Phylum,levels = unique(host$Phylum))
+
+
+theme_set(theme_llm(base_size = 12,margin=FALSE))
+color_mapping <- c("Firmicutes"="#AFF05B","Bacteroidota"="#6E40AA","Proteobacteria"="#00BFFF","Spirochaetota"="#FFD92F","Pseudomonadota"="#E5C494","Actinobacteriota"="#FC8D62","Campylobacterota"="#8DA0CB","Fibrobacterota"="#E78AC3")
+ggplot()  + 
+  geom_col(data= filter(host,Species!="sum"),
+           mapping = aes(x=Hosts,y=number ,fill=Species),
+           alpha=0.7) +
+  labs(fill="Sources")+
+  scale_color_manual(
+    values = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD","Human"="#3FAAE2"),
+    breaks = c("Chicken", "Pig", "Ruminant","Human"),
+  aesthetics = c("fill"))+
+  geom_point(data= filter(host,Species=="sum"),
+             group=1,mapping=aes(x=Hosts,y=number+0.25,colour=Phylum),size = 2) +
+  scale_color_manual(values = color_mapping)+
+  labs(y = "Genomes(%)",x="Genus of Hosts")+
+  theme(aspect.ratio=0.32)+
+  #ggsci::scale_fill_npg()+
+  #scale_color_manual(values  = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD"),aesthetics = c("fill"))+
+  theme(legend.position = c(0.85,0.53))+
+  theme(legend.text = element_text(size = 8))+
+  theme(legend.key.size = unit(1,"mm"))+
+  theme(legend.margin = margin(0.1,0.1,0.1,0.1,'mm'))+
+  theme(legend.title = element_text(size = 8))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Principal Co-ordinates Analysis (PCoA) plot of Bray-Curtis dissimilarity matrix calculated from TPM value of common VCs
+```{r,warning=FALSE,message=FALSE}
+chick_pig_cow_pcoa <- read.csv("../Pre-processed_Files/chick_pig_cow_poca.point.csv",header = T)
+chick_pig_cow_pcoa <- column_to_rownames(chick_pig_cow_pcoa,"X")
+
+theme_set(theme_llm(base_size = 16,legend = "right"))
+ggplot(chick_pig_cow_pcoa, aes(x=V1, y=V2, colour=Source))+geom_point(alpha=0.7, size=1)+
+  scale_color_manual(
+    values = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD"))+
+  stat_ellipse()+
+  xlab("PC1 (14.8%)")+
+  ylab("PC2 (10.6%)")
+
+```
+
+## Box plot showing the GC content among phage genomes at different host phylum (left) and different phage family (right)
+
+```{r,warning=FALSE,message=FALSE}
+gc_content <- read.csv("../Pre-processed_Files/gc_content.csv",header = T)
+library(ggsignif)
+
+comparisons <- list(c("Bacteroidota", "Firmicutes"),c("Firmicutes", "Proteobacteria"),c("Bacteroidota","Proteobacteria"))
+theme_set(theme_llm(base_size = 16,legend = "none"))
+p1 <- ggplot(filter(gc_content,Category=="Phylum"), aes(x = Group, y = GC,color=Group)) +
+    geom_boxplot(size=0.5)+ 
+  scale_color_manual(values  = c("Bacteroidota"="#6E40AA","Firmicutes"="#AFF05B","Proteobacteria"="#00BFFF"))+
+   
+      stat_boxplot(geom ='errorbar', width = 0.3) +
+
+ geom_jitter(aes(color=Group), size=2, alpha=0.7, width = 0.2)+
+  geom_signif(
+    comparisons = comparisons, test = "t.test",
+    map_signif_level = TRUE, textsize = 4,
+    step_increase = 0.1,color="black"
+  )+
+  theme(aspect.ratio=2)+
+  ylab("Phage GC content (%)")+
+   xlab("")+
+   theme(legend.title=element_blank())+
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    
+## family group
+comparisons2 <- list(c("Herelleviridae", "Salasmaviridae"),c("Salasmaviridae","Schitoviridae"),c("Schitoviridae","Drexlerviridae"),c("Herelleviridae","Schitoviridae"),c("Salasmaviridae","Drexlerviridae"),c("Herelleviridae","Drexlerviridae"))
+theme_set(theme_llm(base_size = 16,legend = "none"))
+gc_content$Group <- factor(gc_content$Group,levels = c("Herelleviridae", "Salasmaviridae","Schitoviridae", "Drexlerviridae","Chicken","Pig","Ruminant"))
+p2 <- ggplot(filter(gc_content,Category=="Taxonomy"), aes(x = Group, y = GC,color=Group)) +
+    geom_boxplot(size=0.5)+ 
+  scale_color_manual(values  = c("Drexlerviridae"="#FCCDE5","Herelleviridae"="#E392FE","Salasmaviridae"="#F5EC00","Schitoviridae"="#8DD3C7"))+
+   
+      stat_boxplot(geom ='errorbar', width = 0.3) +
+
+  geom_jitter(aes(color=Group), size=2, alpha=0.7, width = 0.2)+
+  geom_signif(
+    comparisons = comparisons2, test = "t.test",
+    map_signif_level = TRUE, textsize = 4,
+    step_increase = 0.03,color="black"
+  )+
+  theme(aspect.ratio=2)+
+  ylim(c(25,70))+
+  ylab("Phage GC content (%)")+
+   xlab("")+
+   theme(legend.title=element_blank())+
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+## sources
+comparisons3 <- list(c("Chicken", "Pig"),c("Pig","Ruminant"))
+theme_set(theme_llm(base_size = 16,legend = "none"))
+#gc_content$Group <- factor(gc_content$Group,levels = c("Chicken", "Pig","Ruminant"))
+
+p3 <- ggplot(filter(gc_content,Category=="Sources"), aes(x = Group, y = GC,color=Group)) +
+    geom_boxplot(size=0.5)+ 
+  scale_color_manual(values  = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD"))+
+   
+      stat_boxplot(geom ='errorbar', width = 0.3) +
+
+  geom_jitter(aes(color=Group), size=2, alpha=0.7, width = 0.2)+
+  geom_signif(
+    comparisons = comparisons3, test = "t.test",
+    map_signif_level = TRUE, textsize = 4,
+    step_increase = 0.03,color="black"
+  )+
+  theme(aspect.ratio=2)+
+  ylim(c(25,70))+
+  ylab("Phage GC content (%)")+
+   xlab("")+
+   theme(legend.title=element_blank())+
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+library(patchwork)
+p1|p2|p3
+```
+
+## Box plot showing the mapping rate and ratio of phages and bacteria in different domestic animals.
+```{r,warning=FALSE,message=FALSE}
+mappingrate <- read.table("../Pre-processed_Files/mappingrate.txt",header = T)
+mappingrate$Category <- factor(mappingrate$Category, levels = c("Phage", "Bacteria", "Ratio"))
+
+theme_set(theme_llm(base_size = 16,legend = "top",margin=FALSE))
+
+# grouped boxplot
+ggplot(mappingrate, aes(x=Species, y=Rate, fill=Category)) + 
+  geom_boxplot(lwd=0.2,outlier.size = 0.2,outlier.color = "grey")+
+  scale_fill_discrete(limits = c("phage", "Bacteria", "Ratio"))+
+  labs(x = "Sources",y="Mapping Rate")+
+  theme(aspect.ratio=1)+
+  ggsci::scale_fill_npg()+
+  theme(legend.title=element_blank())
+
+```
+
+<!-- ## Significant Pearson correlation between relative abundances of representative phages and their hosts in different domestic animals -->
+
+
+<!-- ```{r,warning=FALSE,message=FALSE} -->
+<!-- chick_pig_cow_cor <- read.csv("../Pre-processed_Files/chick_pig_cow_cor.csv",header = T) -->
+<!-- ggplot(chick_pig_cow_cor, aes(x = log(Host,2), y = log(Phage,2), color = Source)) + -->
+<!--   geom_point(size=0.5,alpha = 0.5) +   -->
+<!--   ylim(0,20)+ -->
+<!--   geom_smooth(method = "lm", se = T,size=0.5)+theme(aspect.ratio=1)+ -->
+<!--   scale_color_manual(values  = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD"))+ -->
+<!--   theme(aspect.ratio=1) -->
+
+<!-- ``` -->
+
+## Box plot showing the Bray-Curtis dissimilarity in different domestic animals.
+```{r,message=FALSE,warning=FALSE}
+phage_bray_dis <- read.csv("../Pre-processed_Files/phage_bray_dis.csv",header = 1)
+phage_bray_dis$group <- factor(phage_bray_dis$group,levels = c("Chicken_Ruminant","Chicken_Pig","Ruminant_Pig"))
+theme_set(theme_llm(base_size = 16,legend = "none",margin=FALSE))
+
+# grouped boxplot
+
+p4 <- ggplot(phage_bray_dis, aes(x=group, y=value, fill=group)) + 
+  geom_boxplot(lwd=0.2,outlier.size = 0.2,outlier.color = "grey")+
+  labs(x = "Phages",y="Bray-Curtis dissimilarity")+
+  theme(aspect.ratio=2.5)+
+  geom_signif(
+    comparisons = list(c("Chicken_Ruminant", "Chicken_Pig"),c("Chicken_Pig","Ruminant_Pig")), test = "t.test",
+    map_signif_level = TRUE, textsize = 4,
+    step_increase = -0.03,color="black"
+  )+
+  ggsci::scale_fill_npg()+
+  ylim(0.4,1.05)+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.title=element_blank())
+
+
+bac_bray_dis <- read.csv("../Pre-processed_Files/bac_bray_dis.csv",header = 1)
+bac_bray_dis$group <- factor(bac_bray_dis$group,levels = c("Chicken_Ruminant","Chicken_Pig","Ruminant_Pig"))
+p5 <- ggplot(bac_bray_dis, aes(x=group, y=value, fill=group)) + 
+  geom_boxplot(lwd=0.2,outlier.size = 0.2,outlier.color = "grey")+
+  labs(x = "Bacteria",y="Bray-Curtis dissimilarity")+
+  theme(aspect.ratio=2.5)+
+  geom_signif(
+    comparisons = list(c("Chicken_Ruminant", "Chicken_Pig"),c("Chicken_Pig","Ruminant_Pig")), test = "t.test",
+    map_signif_level = TRUE, textsize = 4,
+    step_increase = -0.03,color="black"
+  )+
+  ggsci::scale_fill_npg()+
+  ylim(0.4,1.05)+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(legend.title=element_blank())
+
+library(patchwork)
+p4|p5
+  
+```
+
+## NMDS analysis of the core phage communities
+```{r,message=FALSE,warning=FALSE}
+chick_pig_cow_nmds <- read.csv("../Pre-processed_Files/NMDSpoints1_chick_pig_cow.csv",header = T)
+chick_pig_cow_nmds <- column_to_rownames(chick_pig_cow_nmds,"X")
+ggplot(chick_pig_cow_nmds, aes(x=MDS1, y=MDS2, colour=Source))+geom_point(alpha=0.7, size=1)+
+  scale_color_manual(
+    values = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD"))+
+  stat_ellipse()
+
+```
+
+## PCoA analysis of the core bacterial communities 
+```{r,message=FALSE,warning=FALSE}
+chick_pig_cow_bac_pcoa <- read.csv("../Pre-processed_Files/pcoa_bac_points.csv",header = T)
+
+chick_pig_cow_bac_pcoa <- column_to_rownames(chick_pig_cow_bac_pcoa,"X")
+ggplot(chick_pig_cow_bac_pcoa, aes(x=V1, y=V2, colour=Source))+geom_point(alpha=0.7, size=1)+
+  scale_color_manual(
+    values = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD"))+
+  stat_ellipse()+
+  xlab("PCoA1 (20.66%)")+
+  ylab("PCoA2 (16.57%)")
+```
+
+## NMDS analysis of the core bacterial communities 
+```{r,message=FALSE,warning=FALSE}
+chick_pig_cow_bac_nmds <- read.csv("../Pre-processed_Files/bacNMDSpoints1.csv",header = T)
+
+#chick_pig_cow_bac_nmds <- column_to_rownames(chick_pig_cow_bac_nmds,"X")
+ggplot(chick_pig_cow_bac_nmds, aes(x=MDS1, y=MDS2, colour=Source))+geom_point(alpha=0.7, size=1)+
+  scale_color_manual(
+    values = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD"))+
+  stat_ellipse()
+
+```
