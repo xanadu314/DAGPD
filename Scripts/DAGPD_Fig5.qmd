@@ -1,0 +1,319 @@
+---
+title: "DAGPD: Coevolution and coadaptation with Prevotella and animals"
+author: "Yuxuan Huang"
+format: 
+  html:
+    embed-resources: true
+---
+
+# Coevolution and coadaptation with Prevotella and animals
+
+## GC content of crAss-like phages alpha group
+
+```{r,warning=FALSE,message=FALSE}
+setwd("~/Downloads/DAGPD/cell/Scripts")
+library(tidyverse)
+source("./theme_llm.R")
+theme_set(theme_llm(base_size = 16,legend = "none"))
+# alpha group
+
+GC <- read.table("../Pre-processed_Files/Alpha_GC.txt",header = T)
+GC$Sources <- factor(GC$Sources,levels = c("Chicken", "Pig","Ruminant", "Human"))
+library(ggsignif)
+comparisons <- list(c("Pig", "Ruminant"),c("Ruminant", "Human"),c("Pig","Human"),c("Chicken", "Pig"), c("Chicken", "Ruminant"),c("Chicken", "Human"))
+ggplot(GC, aes(x=Sources, y=GC, color=Sources)) +
+  geom_boxplot(size=0.5) +
+   scale_color_manual(values  = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD","Human"="#3FAAE2"))+
+  stat_boxplot(geom ='errorbar', width = 0.3) +
+  geom_jitter(aes(color=Sources), size=2, alpha=0.7, width = 0.2)+
+   geom_signif(
+    comparisons = comparisons, test = "wilcox.test",
+    map_signif_level = F, textsize = 4,
+    step_increase = 0.1,color="black"
+  ) +
+   ylab("crAssphage GC (%)")+
+   xlab("")+
+   theme(legend.title=element_blank())+
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## GC content of crAss-like phages beta group
+```{r,warning=FALSE,message=FALSE}
+# beta group
+theme_set(theme_llm(base_size = 16,legend = "none"))
+GC <- read.csv("../Pre-processed_Files/crass_beta_gc.csv",header = T)
+GC$Sources <- factor(GC$Sources,levels = c("Chicken", "Pig","Ruminant", "Human"))
+library(ggsignif)
+comparisons <- list(c("Pig", "Ruminant"),c("Ruminant", "Human"),c("Pig","Human"),c("Chicken", "Pig"), c("Chicken", "Ruminant"),c("Chicken", "Human"))
+ggplot(GC, aes(x=Sources, y=GC, color=Sources)) +
+  geom_boxplot(size=0.5) +
+   scale_color_manual(values  = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD","Human"="#3FAAE2"))+
+  stat_boxplot(geom ='errorbar', width = 0.3) +
+  geom_jitter(aes(color=Sources), size=2, alpha=0.7, width = 0.2)+
+   geom_signif(
+    comparisons = comparisons, test = "wilcox.test",
+    map_signif_level = FALSE, textsize = 4,
+    step_increase = 0.1,color="black"
+  ) +
+   ylab("crAssphage GC (%)")+
+   xlab("")+
+   theme(legend.title=element_blank())+
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## GC content of *Prevotella* spp.
+```{r,warning=FALSE,message=FALSE}
+#bacteria_gc
+theme_set(theme_llm(base_size = 16,legend = "none"))
+GC_bac <- read.table("../Pre-processed_Files/prevotella_gc.txt",header = T)
+GC_bac$Sources <- factor(GC_bac$Sources,levels = c("Chicken", "Pig","Ruminant", "Human"))
+library(ggsignif)
+comparisons <- list(c("Pig", "Ruminant"),c("Chicken", "Pig"), c("Chicken", "Ruminant"),c("Chicken", "Human"))
+ggplot(GC_bac, aes(x=Sources, y=GC, color=Sources)) +
+  geom_boxplot(size=0.5) +
+   scale_color_manual(values  = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD","Human"="#3FAAE2"))+
+  stat_boxplot(geom ='errorbar', width = 0.3) +
+  geom_jitter(aes(color=Sources), size=2, alpha=0.7, width = 0.2)+
+   geom_signif(
+    comparisons = comparisons, test = "wilcox.test",
+    map_signif_level = FALSE, textsize = 4,
+    step_increase = 0.1,color="black"
+  ) +
+   ylab(expression(paste(italic("Prevotella "), "GC (%)",sep = "")))+
+   xlab("")+
+   theme(legend.title=element_blank())+
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ 
+```
+
+## Heatmap of crAss-like phages relative abundance 
+```{r,warning=FALSE,message=FALSE}
+chick_phage_all_tpm_df_crass_feces <-read.csv("../Pre-processed_Files/chick_phage_crass.csv",row.names = 1)
+
+chick_geo_group <- read.table("../Pre-processed_Files/chick_geo_group.txt",header = T,sep = "\t")
+
+chick_geo_group <- column_to_rownames(chick_geo_group,"id")
+
+chick_geo_group <- filter(chick_geo_group,ource=="feces"|ource=="cecum")
+
+annotation_col = chick_geo_group["continent"]
+chick_phage_all_tpm_df_crass_feces <- chick_phage_all_tpm_df_crass_feces[,rownames(chick_geo_group)]
+rownames(chick_phage_all_tpm_df_crass_feces) <- gsub(pattern = "chick",replacement = "chicken",x = rownames(chick_phage_all_tpm_df_crass_feces))
+library(RColorBrewer)
+pheatmap::pheatmap(log(chick_phage_all_tpm_df_crass_feces+1),
+                   show_rownames = T,
+                   show_colnames = F,
+                   annotation_col = annotation_col,
+                   treeheight_row = 10,
+                   treeheight_col = 10,
+                   legend = F,
+                   breaks = seq(0,12,by=0.12),
+                   annotation_legend = T,
+                   annotation_colors = list(continent = c("Asia" = "#FB8072",
+                                                          "Europe"= "#BEBADA",
+                                                          "North America"="#FDB462",
+                                                          "Oceania"="#80B1D3")),
+                   color = colorRampPalette(colors = c("grey","#fffbdf","orange","red"))(100))
+
+
+chicken_crass_prevotella <- filter(chick_phage_all_tpm_df_crass_feces,rownames(chick_phage_all_tpm_df_crass_feces) %in% c("chicken_phage_4603","chicken_phage_5252","chicken_phage_3894","chicken_phage_4328","chicken_phage_4126","chicken_phage_4414","chicken_phage_4605","chicken_phage_4020","chicken_phage_5812","chicken_phage_3336","chicken_phage_3600","chicken_phage_5952"))
+
+chicken_crass_prevotella_abundance <- colSums(chicken_crass_prevotella)
+
+chicken_crass_bacteroides <- filter(chick_phage_all_tpm_df_crass_feces,rownames(chick_phage_all_tpm_df_crass_feces) %in% c("chicken_phage_3394","chicken_phage_5709","chicken_phage_3688","chicken_phage_3418","chicken_phage_3104","chicken_phage_5699"))
+
+chicken_crass_bacteroides_abundance <- colSums(chicken_crass_bacteroides)                            
+```
+
+```{r,warning=FALSE,message=FALSE}
+pig_phage_all_tpm_df_crass <- read.csv("../Pre-processed_Files/pig_phage_crass.csv",row.names = 1)
+
+pig_geo_group <- read.table("../Pre-processed_Files/pig_geo_group.txt",header = T,sep = "\t")
+pig_geo_group <- column_to_rownames(pig_geo_group,"Run")
+annotation_col = pig_geo_group["continent"]
+library(RColorBrewer)
+pheatmap::pheatmap(log(pig_phage_all_tpm_df_crass+1),
+                   show_rownames = T,
+                   show_colnames = F,
+                   annotation_col = annotation_col,
+                   cluster_rows = TRUE,
+                   cluster_cols = TRUE, 
+                   treeheight_row = 10,
+                   treeheight_col = 10,
+                   legend = F,
+                   annotation_legend = TRUE,
+                   annotation_colors = list(continent = c("Asia" = "#FB8072",
+                                                          "Europe"= "#BEBADA",
+                                                          "North America"="#FDB462",
+                                                          "Oceania"="#80B1D3")),
+                   color = colorRampPalette(colors = c("grey","#fffbdf","orange","red"))(100))
+
+```
+
+```{r,warning=FALSE,message=FALSE}
+cow_phage_all_tpm_df_crass <- read.csv("../Pre-processed_Files/p_cow_crass.heatmap.csv",row.names = 1)
+cow_geo_group <- read.table("../Pre-processed_Files/cow_geo_group.txt",header = T,sep = "\t")
+cow_geo_group <- column_to_rownames(cow_geo_group,"id")
+rownames(cow_phage_all_tpm_df_crass) <- rownames(cow_phage_all_tpm_df_crass) %>% gsub("cow","ruminant",.)
+
+annotation_col = cow_geo_group["continent"]
+library(RColorBrewer)
+
+pheatmap::pheatmap(log(cow_phage_all_tpm_df_crass+1),
+                   show_rownames = T,
+                   show_colnames = F,
+                   annotation_col = annotation_col,
+                   treeheight_row = 10,
+                   treeheight_col = 10,
+                   legend = F,
+                   annotation_legend =T,
+                   breaks = seq(0,12,by=0.12),
+                   annotation_colors = list(continent = c("Asia" = "#FB8072",
+                                                          "Europe"= "#BEBADA",
+                                                          "North America"="#FDB462",
+                                                          "Oceania"="#80B1D3")),
+                   color = colorRampPalette(colors = c("grey","#fffbdf","orange","red"))(100))
+
+cow_crass_prevotella <- filter(cow_phage_all_tpm_df_crass,rownames(cow_phage_all_tpm_df_crass) %in% c("ruminant_phage_05510","ruminant_phage_02792","ruminant_phage_26550","ruminant_phage_10648","ruminant_phage_26670","ruminant_phage_27233","ruminant_phage_15105","ruminant_phage_05441","ruminant_phage_28764","ruminant_phage_08269","ruminant_phage_31701","ruminant_phage_32379","ruminant_phage_15569","ruminant_phage_23344","ruminant_phage_03400","ruminant_phage_00888","ruminant_phage_32242","ruminant_phage_11818","ruminant_phage_07141","ruminant_phage_28412","ruminant_phage_12024","ruminant_phage_32506","ruminant_phage_17518","ruminant_phage_06156","ruminant_phage_18784","ruminant_phage_16979","ruminant_phage_27337","ruminant_phage_08542","ruminant_phage_28423","ruminant_phage_29855","ruminant_phage_29620","ruminant_phage_29612","ruminant_phage_29922","ruminant_phage_29859","ruminant_phage_06886","ruminant_phage_06665","ruminant_phage_29722","ruminant_phage_30575","ruminant_phage_12511","ruminant_phage_29998","ruminant_phage_30543","ruminant_phage_29841","ruminant_phage_30134","ruminant_phage_30194","ruminant_phage_29741"))
+
+cow_crass_prevotella_abundance <- colSums(cow_crass_prevotella)
+
+cow_crass_bacteroides <- filter(cow_phage_all_tpm_df_crass,rownames(cow_phage_all_tpm_df_crass) %in% c("ruminant_phage_32242","ruminant_phage_08542"))
+
+cow_crass_bacteroides_abundance <- colSums(cow_crass_bacteroides)
+```
+
+## Box plot showing the relative abundance of crAss-like phages within different animals and bacterial hosts
+
+```{r,warning=FALSE,message=FALSE}
+chicken_crass_bacteroides_abundance_df <- as.data.frame(chicken_crass_bacteroides_abundance)
+chicken_crass_bacteroides_abundance_df$source="Chicken"
+
+cow_crass_bacteroides_abundance_df <- as.data.frame(cow_crass_bacteroides_abundance)
+cow_crass_bacteroides_abundance_df$source="Ruminant"
+
+colnames(cow_crass_bacteroides_abundance_df) <- c("Abundance","source")
+colnames(chicken_crass_bacteroides_abundance_df) <- c("Abundance","source")
+chick_ruminant_crass_bacteroides <- rbind(chicken_crass_bacteroides_abundance_df,cow_crass_bacteroides_abundance_df)
+
+library(ggsignif)
+theme_set(theme_llm(base_size = 16,legend = "none"))
+#comparisons01=list(c("Chicken","Ruminant"))
+ggplot(chick_ruminant_crass_bacteroides,aes(x=source,y=Abundance,fill=source))+ 
+  geom_boxplot()+
+  #scale_y_log10()+
+  ylab("Relative Abundance of Bacteroides crAss-like Phages")+
+  stat_boxplot(geom ='errorbar', width = 0.3)+
+  scale_fill_manual(values  = c("Chicken"="#FFBC00","Ruminant"="#0AC5AD"))+
+  geom_signif(comparisons = list(c("Chicken","Ruminant")), 
+            test = "wilcox.test", 
+            textsize = 6, 
+            tip_length = 0.01)+
+  ylim(10,300)
+
+chicken_crass_prevotella_abundance_df <- as.data.frame(chicken_crass_prevotella_abundance)
+chicken_crass_prevotella_abundance_df$source="Chicken"
+
+cow_crass_prevotella_abundance_df <- as.data.frame(cow_crass_prevotella_abundance)
+cow_crass_prevotella_abundance_df$source="Ruminant"
+
+colnames(cow_crass_prevotella_abundance_df) <- c("Abundance","source")
+colnames(chicken_crass_prevotella_abundance_df) <- c("Abundance","source")
+chick_ruminant_crass_prevotella <- rbind(chicken_crass_prevotella_abundance_df,cow_crass_prevotella_abundance_df)
+
+ggplot(chick_ruminant_crass_prevotella,aes(x=source,y=Abundance,fill=source))+ 
+  geom_boxplot()+
+  #scale_y_log10()+
+  ylab("Relative Abundance of Prevotela crAss-like Phages")+
+  stat_boxplot(geom ='errorbar', width = 0.3)+
+  ylim(10,10000)+
+  scale_fill_manual(values  = c("Chicken"="#FFBC00","Ruminant"="#0AC5AD"))+
+  geom_signif(comparisons = list(c("Chicken","Ruminant")), 
+            test = "wilcox.test", 
+            textsize = 6, 
+            tip_length = 0.01)
+```
+
+## Prevalence of specific crAss-like phages in chickens and ruminants
+
+```{r,warning=FALSE,message=FALSE}
+prevalence_data <- data.frame(
+source = rep(c("Ruminant","Chicken"), each = 2),
+host = rep(c("Prevotella", "Bacteroides"), times = 2),
+value = c(0.9017758,0.3701443,0.8820116,0.6073501)
+)
+theme_set(theme_llm(base_size = 16,legend = "right"))
+ggplot(prevalence_data, aes(x = host, y = value*100, fill = source))+
+  geom_bar(stat = "identity", position = "dodge")+
+  scale_fill_manual(values  = c("Chicken"="#FFBC00","Ruminant"="#0AC5AD"))+
+  ylab("Prevalence (%)")+xlab("")+theme(aspect.ratio=1)+ylim(0,100)
+
+```
+## Box plot showing the relative abundance of crAss-like phages in goat, sheep, and dairy cattle
+```{r,warning=FALSE,message=FALSE}
+goat_sheep_cattle <- read.csv("../Pre-processed_Files/goat_sheep_cattle_crass.csv",header = T)
+
+goat_sheep_cattle$source <- factor(goat_sheep_cattle$source,levels = c("Goat","Sheep","Dairy_cattle"))
+library(ggsignif)
+theme_set(theme_llm(base_size = 16,legend = "none"))
+comparisons3=list(c("Goat","Sheep"),c("Sheep","Dairy_cattle"),c("Goat","Dairy_cattle"))
+ggplot(goat_sheep_cattle,aes(x=source,y=abundance,fill=source))+ 
+  geom_boxplot()+
+ ylim(0,350)+
+  ylab("TPM")+ggsci::scale_fill_npg()+
+  stat_boxplot(geom ='errorbar', width = 0.3) +
+  geom_signif(comparisons = list(c("Goat","Sheep")), 
+            test = "wilcox.test", 
+            textsize = 6, 
+            tip_length = 0.01,
+            y_position = c(150,200))+
+  geom_signif(comparisons = list(c("Sheep","Dairy_cattle")), 
+              test = "wilcox.test", 
+              textsize = 6, 
+              tip_length = 0.01,
+              y_position = c(200,250))+
+  geom_signif(comparisons = list(c("Goat","Dairy_cattle")), 
+              test = "wilcox.test", 
+              textsize = 6, 
+              tip_length = 0.01,
+              y_position = c(250,300))
+```
+
+
+## Box plot showing the relative abundance of crAss-like phages between wild boars, Duroc pigs and Licha pigs
+```{r,warning=FALSE,message=FALSE}
+## different breed
+pig_breed_group <- read.table("../Pre-processed_Files/pig_breed_group.txt",header = T)
+pig_PA <- read.csv("../Pre-processed_Files/pig_crass_in_every_country.csv")
+pig_breed_crass_rate <- left_join(pig_breed_group,pig_PA,by="id")
+library(ggsignif)
+theme_set(theme_llm(base_size = 16,legend = "none"))
+pig_breed_crass_rate$Breed <- factor(pig_breed_crass_rate$Breed,levels = c("Wild-Boar","Duroc","Licha"))
+ggplot(pig_breed_crass_rate,aes(x=Breed,y=sum,fill=Breed))+ 
+  geom_boxplot()+
+ ylim(0,1800)+
+  ylab("TPM")+
+  stat_boxplot(geom ='errorbar', width = 0.3)+
+geom_signif(comparisons = list(c("Duroc", "Licha")), 
+            test = "wilcox.test", 
+            textsize = 6, 
+            tip_length = 0.01,
+            y_position = c(800,900))+
+  geom_signif(comparisons = list(c("Duroc", "Wild-Boar")), 
+              test = "wilcox.test", 
+              textsize = 6, 
+              tip_length = 0.01,
+              y_position = c(500,600))+
+  geom_signif(comparisons = list(c("Licha", "Wild-Boar")), 
+              test = "wilcox.test", 
+              textsize = 6, 
+              tip_length = 0.01,
+              y_position = c(300,400))+
+  ggsci::scale_fill_npg()
+
+```
+
+### sessionInfo
+```{r}
+sessionInfo()
+```
