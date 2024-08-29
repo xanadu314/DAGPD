@@ -20,7 +20,7 @@ done<id.txt
 ### merge PPR and vs2 results and rename as all.ppr.vs2.fasta
 
 ## cd-hit
-cd-hit-est  -i all.ppr.vs2.9k.fasta -o cdhit2.ppr.vs2.9k.fasta -c 0.95 -M 640000 -T 48 -n 11 -d 0 -aS 0.95 -g 1 -sc 1 -sf 1
+cd-hit-est  -i all.ppr.vs2.9k.fasta -o cdhit2.ppr.vs2.9k.fasta -c 0.95 -M 640000 -T 48 -n 11 -d 0 -aS 0.85 -g 1 -sc 1 -sf 1
 
 ## what the phage
 nextflow run What_the_Phage-master/phage.nf -profile local,singularity --cores 16 --max_cores 48 --sk --vf --vs --dv --mp --pp --vn --sm --identify --fasta ./cdhit2.ppr.vs2.fasta 
