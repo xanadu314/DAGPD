@@ -1,6 +1,8 @@
 # DAGPD
 Domestic Animals Gut Phage Database
 
+<img src="img/github_workflow.png" width="900">
+
 ## Overview of pipline
 The scripts of metagenome and virome analysis are placed in [Pipeline](https://github.com/xanadu314/DAGPD/tree/main/Pipeline) directory.
 There are three main modules in the pipeline:
