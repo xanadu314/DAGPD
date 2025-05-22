@@ -1,0 +1,503 @@
+---
+title: "DAGPD: Both Bacterial and Phage community relationships Reflects Host Phylogeny"
+author: "Yuxuan Huang"
+format: 
+  html:
+    embed-resources: true
+---
+## The gut bacterial community and animal species
+```{r,warning=FALSE,message=FALSE}
+setwd("~/DAGPD/Scripts/")
+.libPaths("/home/lsx/R/x86_64-pc-linux-gnu-library/4.4/")
+library(tidyverse)
+source("~/DAGPD/Scripts/theme_llm.R")
+# distance to dataframe
+
+library(vegan)
+group_means <- read.csv("../Pre-processed_Files/bac_group_mean.csv")
+group_means <- column_to_rownames(group_means,"X")
+datNorm <-decostand(group_means,"hell")
+dist_matrix <- vegdist(datNorm, method = "bray")
+dist_matrix_full <- as.matrix(dist_matrix)
+dist_df <- reshape2::melt(dist_matrix_full, varnames = c("Var1", "Var2"), value.name = "Bac_dis")
+
+# unique
+library(dplyr)
+dist_df_unique <- dist_df %>%
+  rowwise() %>%
+  mutate(
+    Var1 = as.character(Var1),  # 
+    Var2 = as.character(Var2)   # 
+  ) %>% 
+  mutate(pair = paste(sort(c(Var1, Var2)), collapse = "-")) %>%
+  distinct(pair, .keep_all = TRUE)
+
+# rename
+#colnames(dist_df) <- c("Node1", "Node2", "Distance")
+
+# unique
+
+dist_df_unique <- dist_df_unique[dist_df_unique$Var1 != dist_df_unique$Var2,]
+
+colnames(dist_df_unique) <- c("Var1","Var2","Bac_dis","pair")
+
+# animal tree
+library(ape)
+tree2 <- read.tree("../Pre-processed_Files/timetree.newick")
+dist_matrix2 <- cophenetic.phylo(tree2)
+
+# distance to dataframe
+dist_df2 <- as.data.frame(as.table(dist_matrix2))
+
+
+# unique
+dist_df2_unique <- dist_df2 %>%
+  rowwise() %>%
+  mutate(
+    Var1 = as.character(Var1),  # 
+    Var2 = as.character(Var2)   # 
+  ) %>% 
+  mutate(pair = paste(sort(c(Var1, Var2)), collapse = "-")) %>%
+  distinct(pair, .keep_all = TRUE)
+# dist_long <- dist_long[dist_long$Sample1 != dist_long$Sample2, ]
+dist_df2_unique <- dist_df2_unique[dist_df2_unique$Var1 != dist_df2_unique$Var2,]
+colnames(dist_df2_unique) <- c("Var1", "Var2", "MYA","pair")
+
+#dist_df$ID <- paste(dist_df$Var1,dist_df$Var2,sep = "-")
+#dist_df2$ID <- paste(dist_df2$Var1,dist_df2$Var2,sep = "-")
+
+bac_MYA <- merge(dist_df_unique[,c(3,4)],dist_df2_unique[,c(3,4)],by="pair")
+
+library(ggplot2)
+
+# Liner Model
+#bac_MYA <- read.csv("./bac_MYA.csv")
+model <- lm(bac_MYA$Bac_dis ~ log(bac_MYA$MYA), data = bac_MYA)
+# R² and p value
+r_squared <- summary(model)$r.squared  # R² = 0.6951766
+p_value <- summary(model)$coefficients[2, 4]  # p= 11.160199e-12
+
+theme_set(theme_llm(base_size = 12,margin=FALSE))
+#write.csv(bac_MYA,"bac_MYA.csv")
+
+ggplot(bac_MYA, aes(x = log(bac_MYA$MYA), y = bac_MYA$Bac_dis )) +
+  geom_point(color = "#E64B35", size = 5, alpha = 0.75) +  # point
+  geom_smooth(method = "lm", se = TRUE,
+              fill = "#E64B35",
+              alpha = 0.25,  # transparent
+              show.legend = FALSE,
+              linewidth = 0
+  ) +  # line
+  labs( x = "Domestic animal phylogenetic distance", y = "Differences in gut bacteria")   # title
+
+```
+## The gut phage community and animal species
+```{r,warning=FALSE,message=FALSE}
+# phage
+group_means3 <- read.table("../Pre-processed_Files/phage_community_mean.txt",header = T)
+datNorm <-decostand(t(group_means3),"hell")
+dist_matrix <- vegdist(datNorm, method = "bray")
+dist_matrix_full <- as.matrix(dist_matrix)
+dist_df <- reshape2::melt(dist_matrix_full, varnames = c("Var1", "Var2"), value.name = "phage_dis")
+
+# unique
+library(dplyr)
+dist_df_unique <- dist_df %>%
+  rowwise() %>%
+  mutate(
+    Var1 = as.character(Var1),  # 
+    Var2 = as.character(Var2)   # 
+  ) %>% 
+  mutate(pair = paste(sort(c(Var1, Var2)), collapse = "-")) %>%
+  distinct(pair, .keep_all = TRUE)
+
+
+# unique
+
+dist_df_unique <- dist_df_unique[dist_df_unique$Var1 != dist_df_unique$Var2,]
+
+colnames(dist_df_unique) <- c("Var1","Var2","phage_dis","pair")
+
+phage_MYA <- merge(dist_df_unique[,c(3,4)],dist_df2_unique[,c(3,4)],by="pair")
+
+#write.csv(phage_MYA,"phage_MYA.csv")
+
+library(ggplot2)
+#phage_MYA <- read.csv("./phage_MYA.csv")
+# Liner Model
+model <- lm(phage_MYA$phage_dis ~ log(phage_MYA$MYA), data = bac_MYA)
+# 提取R²和p值
+r_squared <- summary(model)$r.squared  # R² =  0.4583483
+p_value <- summary(model)$coefficients[2, 4]  # p= 3.283213e-07
+
+theme_set(theme_llm(base_size = 12,margin=FALSE))
+ggplot(phage_MYA, aes(x = log(phage_MYA$MYA), y = phage_MYA$phage_dis )) +
+  geom_point(color = "#4DBBD5", size = 5, alpha = 0.75) +  # point
+  geom_smooth(method = "lm", se = TRUE,
+              fill = "#4DBBD5",
+              alpha = 0.25,  # transparent
+              show.legend = FALSE,
+              linewidth = 0
+  ) +  # line
+  labs( x = "Phylogenetic distance", y = "Differences in gut phages")   # title
+#theme_test() 
+```
+
+##  statistic analysis
+```{r,warning=FALSE,message=FALSE}
+# Load required packages
+library(ape)        # for reading and manipulating phylogenetic trees
+library(phytools)   # for additional tree tools
+library(vegan)      # for ecological distance measures and Mantel test
+library(tibble)     # for column_to_rownames()
+
+# Define file paths
+phage_tree_file      <- "../Pre-processed_Files/unrooted_tree_phage.newick"
+animal_tree_file     <- "../Pre-processed_Files/timetree.newick"
+bac_tree_file        <- "../Pre-processed_Files/bac_community_tree.newick"
+bac_group_mean_file  <- "../Pre-processed_Files/bac_group_mean.csv"
+
+# Read in the unrooted phage and animal phylogenies
+tree_phage  <- read.tree(phage_tree_file)
+tree_animal <- read.tree(animal_tree_file)
+
+# Verify that tip labels match between phage and animal trees
+if (!all(sort(tree_phage$tip.label) == sort(tree_animal$tip.label))) {
+  stop("Error: Tip labels of the phage and animal trees do not match.")
+}
+
+# If both trees have internal node labels, check those too
+if (!is.null(tree_phage$node.label) && !is.null(tree_animal$node.label)) {
+  if (!all(sort(tree_phage$node.label) == sort(tree_animal$node.label))) {
+    stop("Error: Internal node labels of the phage and animal trees do not match.")
+  }
+}
+
+# Compute Robinson–Foulds distance between the two trees
+rf_distance <- dist.topo(tree_phage, tree_animal)
+cat("Robinson-Foulds distance:", rf_distance, "\n")
+
+# Compute path difference (PH85) distance
+path_distance <- dist.topo(tree_phage, tree_animal, method = "PH85")
+cat("Path difference (PH85) distance:", path_distance, "\n")
+
+# Define a permutation test for tree distance significance
+permutation_test <- function(tree1, tree2, n_permutations = 9999) {
+  # Observed RF distance
+  observed <- dist.topo(tree1, tree2)
+  
+  # Generate random distances by shuffling tip labels on tree2
+  rand_dists <- numeric(n_permutations)
+  for (i in seq_len(n_permutations)) {
+    permuted <- tree2
+    permuted$tip.label <- sample(tree2$tip.label)
+    rand_dists[i] <- dist.topo(tree1, permuted)
+  }
+  
+  # Calculate p-value (proportion of permuted >= observed)
+  p_val <- 1 - sum(rand_dists >= observed) / (n_permutations + 1)
+  list(observed_distance = observed, p_value = p_val)
+}
+
+# Run permutation test for phage vs animal trees
+set.seed(123)
+result_phage <- suppressWarnings(permutation_test(tree_phage, tree_animal))
+print(result_phage)
+
+# Read the bacterial community tree and compute RF distance to animal tree
+bac_tree     <- read.tree(bac_tree_file)
+rf_bac       <- dist.topo(bac_tree, tree_animal)
+cat("RF distance (bacteria vs animal):", rf_bac, "\n")
+
+# Permutation test for bacteria vs animal trees
+set.seed(12)
+result_bac <- suppressWarnings(permutation_test(bac_tree, tree_animal))
+print(result_bac)
+
+# =========================
+# Mantel test: phage vs original distance matrix
+# =========================
+
+# Identify common tips
+common_phage <- intersect(tree_phage$tip.label, tree_animal$tip.label)
+
+# Compute cophenetic distances from animal tree
+dist_animal_phage <- cophenetic(tree_animal)[common_phage, common_phage]
+
+# Use your original phage distance matrix (named dist_matrix_full)
+# Subset to the same labels and order
+dist_phage_full <- dist_matrix_full[common_phage, common_phage]
+
+# Perform Spearman Mantel test
+mantel_phage <- vegan::mantel(dist_animal_phage, dist_phage_full,
+                              method = "spearman", permutations = 999)
+print(mantel_phage)
+
+# =========================
+# Mantel test: bacteria vs animal
+# =========================
+
+# Identify common tips for bacteria
+common_bac <- intersect(bac_tree$tip.label, tree_animal$tip.label)
+
+# Animal cophenetic distances
+dist_animal_bac <- cophenetic(tree_animal)[common_bac, common_bac]
+
+# Read bacterial group means and compute Bray–Curtis distances
+group_means <- read.csv(bac_group_mean_file)
+group_means <- column_to_rownames(group_means, "X")
+datNorm     <- decostand(group_means, "hellinger")
+dist_bac    <- as.matrix(vegdist(datNorm, method = "bray"))[common_bac, common_bac]
+
+# Spearman Mantel test for bacteria vs animal distances
+mantel_bac <- vegan::mantel(dist_animal_bac, dist_bac,
+                            method = "spearman", permutations = 999)
+print(mantel_bac)
+```
+
+
+## Principal Co-ordinates Analysis (PCoA) plot of Bray-Curtis dissimilarity matrix calculated from TPM value of common genera 
+```{r,warning=FALSE,message=FALSE}
+
+# pcoa bac
+points <- read.csv("../Pre-processed_Files/pcoa_bac.points.csv",header = T)
+eig <- read.csv("../Pre-processed_Files/eig_bac.csv",header = T,col.names = 1)
+theme_set(theme_llm(base_size = 12,margin=FALSE))
+ggplot(points, aes(x=V1, y=V2, colour=Source))+geom_point(alpha=0.7, size=1)+
+  scale_color_manual(
+    values = c("Gallus_gallus"="#FFBC00","Sus_scrofa"="#E588A6",
+               "Bos_taurus"="#0AC5AD","Bubalus_bubalis"="#245E91",
+               "Hydropotes_inermis"="#8572AD","Capra_hircus"="#646464","Ovis_aries"="#00BD00",
+               "Bos_grunniens"="#997300","Meleagris_gallopavo"="#ED7D31","Anas_platyrhynchos"="#FFFF00"))+
+  stat_ellipse()+
+  labs(x = paste("PCoA 1 (", format(100*eig$X1[1]/sum(eig$X1), digits = 4), "%)",sep = ""), 
+       y = paste("PCoA 2 (", format(100*eig$X1[2]/sum(eig$X1), digits = 4), "%)",sep = ""))
+
+#ggplot(points, aes(x=V1, y=V2, colour=localtion))+geom_point(alpha=0.7, size=1)+  stat_ellipse()
+Group1 <- read.table("../Pre-processed_Files/pig_ruminant_sheep_chick_duck_turkey.species.group.txt",header = F,sep = "\t")
+# merged_data <- merge(Group1[,c(1,2)], df, by.x = "V1", by.y = "row.names")
+# group_means <- merged_data %>%
+#   group_by(V2) %>%
+#   summarise(across(-V1, mean, na.rm = TRUE))
+# 
+# group_means <- column_to_rownames(group_means,"V2")
+# datNorm <-decostand(group_means,"hell")
+# dist_matrix <- vegdist(datNorm, method = "bray")
+
+# # Step 3: Perform Hierarchical Clustering
+# hc <- hclust(dist_matrix, method = "complete")
+# #install.packages("ape")
+# library(ape)
+# phylo_tree <- as.phylo(hc)
+
+# # 
+# write.tree(phylo_tree, file = "bac_clustering_tree.newick")
+# 
+# # Step 4: Plot the Dendrogram
+# plot(hc, labels = rownames(group_means), main = "bacterial Sample Clustering",
+#      xlab = "Sample", ylab = "Distance", sub = "", hang = -1)
+# plot(hc, main = "bacterial Sample Clustering (Dendrogram)", xlab = "Sample", ylab = "Dissimilarity")
+# axis(2, at = pretty(hc$height), labels = round(pretty(hc$height), 3))  # Add scale
+
+
+# adonis2(formula = df ~ Source, data = points, permutations = 999, method = "bray", parallel = 12)
+# Permutation test for adonis under reduced model
+# Permutation: free
+# Number of permutations: 999
+# 
+# adonis2(formula = df ~ Source, data = points, permutations = 999, method = "bray", parallel = 12)
+# Df SumOfSqs      R2      F Pr(>F)    
+# Model       9   373.08 0.26291 211.55  0.001 ***
+#   Residual 5338  1045.97 0.73709                  
+# Total    5347  1419.04 1.00000                  
+# ---
+#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+# adonis2(formula = df ~ localtion, data = points, permutations = 999, method = "bray", parallel = 12)
+# Permutation test for adonis under reduced model
+# Permutation: free
+# Number of permutations: 999
+# 
+# adonis2(formula = df ~ localtion, data = points, permutations = 999, method = "bray", parallel = 12)
+# Df SumOfSqs     R2      F Pr(>F)    
+# Model       4   208.32 0.1468 229.84  0.001 ***
+#   Residual 5343  1210.72 0.8532                  
+# Total    5347  1419.04 1.0000                  
+# ---
+#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+
+# # 
+# # PERMANOVA
+# permanova_multi <- adonis2(df ~ Source * localtion, data = points, permutations = 999,parallel = 12)
+# print(permanova_multi)
+# # Permutation test for adonis under reduced model
+# # Permutation: free
+# # Number of permutations: 999
+# # 
+# # adonis2(formula = df ~ Source * localtion, data = points, permutations = 999, parallel = 12)
+# # Df SumOfSqs      R2      F Pr(>F)    
+# # Model      16   541.92 0.38189 205.86  0.001 ***
+# #   Residual 5331   877.12 0.61811                  
+# # Total    5347  1419.04 1.00000                  
+# # ---
+# #   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# permanova_multi2 <- adonis2(df ~ Source * localtion, data = points, permutations = 999,parallel = 12,by="terms")
+
+
+# Permutation test for adonis under reduced model
+# Terms added sequentially (first to last)
+# Permutation: free
+# Number of permutations: 999
+# 
+# adonis2(formula = df ~ Source * localtion, data = points, permutations = 999, by = "terms", parallel = 12)
+# Df SumOfSqs      R2       F Pr(>F)    
+# Source              9   373.08 0.26291 251.944  0.001 ***
+#   localtion           4   126.79 0.08935 192.648  0.001 ***
+#   Source:localtion    3    42.06 0.02964  85.203  0.001 ***
+#   Residual         5331   877.12 0.61811                   
+# Total            5347  1419.04 1.00000                   
+# ---
+#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# #devtools::install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis")
+# library(pairwiseAdonis)
+# pairwise.adonis(x=df, factors=points$Source, sim.function ="vegdist",  
+#                 sim.method ="bray",  
+#                 p.adjust.m ="none", 
+#                 reduce =NULL, 
+#                 perm =999)  
+
+# 2.1.1 NMDS 
+#??decostand # 
+#??vegdist # 
+# set.seed(12345)
+# pre1 <- cmdscale(vegdist(df, k = 2)) # 
+# pre1 # 
+# 
+# set.seed(12345)
+# NMDS1 <- metaMDS(decostand(df,method = "total"),# spe[-c(1:3)]
+#                  # 
+#                  distance = "bray", 
+#                  engine = "monoMDS",# vegan还可以调用MASS的"isoMDS"进行NMDS分析。
+#                  trymax = 20,# 。
+#                  wascores = TRUE, #
+#                  k=2, # 
+#                  previous.best = pre1)
+
+# Run 0 stress 0.3552682 
+# Run 1 stress 0.2238012 
+# ... New best solution
+# ... Procrustes: rmse 0.01004156  max resid 0.03608874 
+# Run 2 stress 0.2310041 
+# Run 3 stress 0.2189755 
+# ... New best solution
+# ... Procrustes: rmse 0.009074463  max resid 0.06047258 
+# Run 4 stress 0.2284296 
+# Run 5 stress 0.2282741 
+# Run 6 stress 0.2231351 
+# *** Best solution was not repeated -- monoMDS stopping criteria:
+#   1: no. of iterations >= maxit
+# 5: scale factor of the gradient < sfgrmin             
+#NMDSpoints1=as.data.frame(NMDS1$points)
+#write.csv(NMDSpoints1,"NMDSpoints_bac.csv")
+NMDSpoints1 <- read.csv(("../Pre-processed_Files/NMDSpoints_bac.csv"))
+Group1 <- read.table("../Pre-processed_Files/pig_ruminant_sheep_chick_duck_turkey.species.group.txt",header = F,sep = "\t")
+
+NMDSpoints1$Source=Group1$V2
+NMDSpoints1$location=Group1$V3
+NMDSpoints1$Class=Group1$V4
+
+theme_set(theme_llm(base_size = 12,margin=FALSE))
+# ggplot(NMDSpoints1, aes(x=MDS1, y=MDS2, colour=location))+geom_point(alpha=0.7, size=1)+
+#   scale_color_manual(
+#     values = c("Asia"="#FB8072","Europe"="#BEBADA","North_America"="#FDB462","Oceania"="#80B1D3"))+
+#   stat_ellipse()               
+
+
+ggplot(NMDSpoints1, aes(x = MDS1, y = MDS2, 
+                 color = Source,  # 
+                 shape = location)) +  
+  scale_color_manual(
+    values = c("Gallus_gallus"="#FFBC00","Sus_scrofa"="#E588A6",
+               "Bos_taurus"="#0AC5AD","Bubalus_bubalis"="#245E91",
+               "Hydropotes_inermis"="#8572AD","Capra_hircus"="#646464","Ovis_aries"="#00BD00",
+               "Bos_grunniens"="#997300","Meleagris_gallopavo"="#ED7D31","Anas_platyrhynchos"="#FFFF00"))+
+  geom_point(size = 2, alpha = 0.7) +  # 设置点大小和透明度
+  scale_shape_manual(values = c("Asia" = 15, "Europe" = 16, "North_America" = 24,"Oceania"= 25))   # 图例标题
+  
+ggplot(points, aes(x=V1, y=V2, shape = localtion,color =localtion))+geom_point(alpha=0.7, size=2)+
+  scale_color_manual(
+    values = c("Asia"="#FB8072","Europe"="#BEBADA","North America"="#FDB462","Oceania"="#80B1D3"))+
+  scale_shape_manual(values = c("Asia" = 15, "Europe" = 16, "North America" = 24,"Oceania"= 25)) + 
+  stat_ellipse()     
+```
+## Principal Co-ordinates Analysis (PCoA) plot of Bray-Curtis dissimilarity matrix calculated from TPM value of common VCs
+```{r,warning=FALSE,message=FALSE}
+#write.csv(points,"pcoa_phage_points.csv")
+points <- read.csv("../Pre-processed_Files/pcoa_phage_points.csv")
+Group1 <- read.table("../Pre-processed_Files/pig_ruminant_sheep_chick_duck_turkey.species.group.txt",header = F,sep = "\t")
+
+points$Source=Group1$V2
+points$location=Group1$V3
+points$Class=Group1$V4
+# 
+#spe.wa <- wascores(pcoa$points, spe)
+eig = read.csv("../Pre-processed_Files/eig_phage.csv",header = T, col.names = 1)
+
+theme_set(theme_llm(base_size = 12,margin=FALSE))
+ggplot(points, aes(x=V1, y=V2, colour=Source))+geom_point(alpha=0.7, size=1)+
+  scale_color_manual(
+    values = c("Gallus_gallus"="#FFBC00","Sus_scrofa"="#E588A6",
+               "Bos_taurus"="#0AC5AD","Bubalus_bubalis"="#245E91",
+               "Hydropotes_inermis"="#8572AD","Capra_hircus"="#646464","Ovis_aries"="#00BD00",
+               "Bos_grunniens"="#997300","Meleagris_gallopavo"="#ED7D31","Anas_platyrhynchos"="#FFFF00"))+
+  stat_ellipse()+
+  labs(x = paste("PCoA 1 (", format(100*eig$X1[1]/sum(eig$X1), digits = 4), "%)",sep = ""), 
+       y = paste("PCoA 2 (", format(100*eig$X1[2]/sum(eig$X1), digits = 4), "%)",sep = ""))
+
+# PcoA1 14.76%,PcoA2 10.82
+#ggplot(points, aes(x=V1, y=V2, colour=location))+geom_point(alpha=0.7, size=1)+  stat_ellipse()
+
+# pcoa_phage_location
+ggplot(points, aes(x=V1, y=V2, colour=location))+geom_point(alpha=0.7, size=1)+
+  scale_color_manual(
+    values = c("Asia"="#FB8072","Europe"="#BEBADA","North_America"="#FDB462","Oceania"="#80B1D3"))+
+  stat_ellipse()+
+  labs(x = paste("PCoA 1 (", format(100*eig$X1[1]/sum(eig$X1), digits = 4), "%)",sep = ""), 
+       y = paste("PCoA 2 (", format(100*eig$X1[2]/sum(eig$X1), digits = 4), "%)",sep = ""))
+#ggplot(points, aes(x=V1, y=V2, colour=localtion))+geom_point(alpha=0.7, size=1)+  stat_ellipse()
+
+# pcoa_phage_class
+# ggplot(points, aes(x=V1, y=V2, colour=Class))+geom_point(alpha=0.7, size=1)+
+#   scale_color_manual(
+#     values = c("Poultry"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD"))+
+#   stat_ellipse()+
+#   labs(x = paste("PCoA 1 (", format(100*pcoa$eig[1] / sum(pcoa$eig), digits = 4), "%)",sep = ""), 
+#        y = paste("PCoA 2 (", format(100*pcoa$eig[2] / sum(pcoa$eig), digits = 4), "%)",sep = ""))
+#adonis2(formula = df ~ Source, data = points, permutations = 999, method = "bray",parallel = 12)
+
+
+# adonis2(formula = df ~ Source, data = points, permutations = 999, method = "bray", parallel = 12)
+#Df SumOfSqs      R2      F Pr(>F)    
+#Model       9   273.51 0.18448 134.16  0.001 ***
+#  Residual 5338  1209.13 0.81552                  
+#Total    5347  1482.64 1.00000                  
+#---
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+# adonis2(formula = df ~ localtion, data = points, permutations = 999, method = "bray", parallel = 12)
+
+# Permutation test for adonis under reduced model
+# Permutation: free
+# Number of permutations: 999
+# 
+# adonis2(formula = df ~ localtion, data = points, permutations = 999, method = "bray", parallel = 12)
+# Df SumOfSqs      R2      F Pr(>F)    
+# Model       4   188.66 0.12725 194.76  0.001 ***
+#   Residual 5343  1293.98 0.87275                  
+# Total    5347  1482.64 1.00000                  
+# ---
+#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+
+```

@@ -1,0 +1,326 @@
+---
+title: "DAGPD: Niche-Dependent Functional Genes in Diverse Domestic Animals"
+author: "Yuxuan Huang"
+format: 
+  html:
+    embed-resources: true
+---
+
+# Niche-Dependent Functional genes in Diverse Domestic Animals
+
+## volcano plot of AMGs relate to Animal hosts
+
+```{r,warning=FALSE,message=FALSE}
+setwd("~/DAGPD/Scripts/")
+.libPaths("/home/lsx/R/x86_64-pc-linux-gnu-library/4.4/")
+source("~/DAGPD/Scripts/theme_llm.R")
+
+require(ggplot2)
+
+library(ggrepel)
+library(tidyverse)
+
+library(viridis)  # color gradation
+gene_hits = read.csv("../Pre-processed_Files/Animal_relate_AMG2.csv", stringsAsFactors=FALSE, header=TRUE)
+gene_hits$logor <- as.numeric(gene_hits$logor)
+
+gene_hits <- filter(gene_hits,gene_hits$adj.p != 0)
+
+theme_set(theme_llm(base_size = 12,legend = "right"))
+ggplot(gene_hits, aes(x=logor, y=logpadj, colour=logpadj, size=abs(logor), label=label)) +
+  geom_point(alpha=0.5) +
+  geom_text_repel(
+    data = subset(gene_hits, label != ""),  # sel points
+    aes(label = label),
+    box.padding = 1,          # padding between point and label
+    segment.alpha = 0.5,
+    min.segment.length = 0.2,
+    max.overlaps = 52,         # overlap of labels
+    size = 3,
+    segment.color = "grey50",    # line color
+    color='black')+
+  geom_hline(yintercept = 1.3,           # line position
+             linetype = "dashed",      # linetype
+             color = "grey50",            # line color
+             linewidth = 1)+
+  xlim(c(-50,200))+
+  ylim(c(-10,160))+
+  xlab(expression(Log[10]~"Odds Ratio"))+
+  ylab(expression(-Log[10] ~ "FDR") )+
+  scale_color_gradient(limits = c(0, 160))+
+  ggtitle("Animal Hosts")
+
+
+```
+
+## volcano plot of AMGs relate to Bacterial hosts
+
+```{r,warning=FALSE,message=FALSE}
+setwd("~/DAGPD/Scripts/")
+gene_hits_bac = read.csv("../Pre-processed_Files/Bacterial_relate_AMG2.csv", stringsAsFactors=FALSE, header=TRUE)
+gene_hits_bac$logor <- as.numeric(gene_hits_bac$logor)
+gene_hits_bac$logpadj <- as.numeric(gene_hits_bac$logpadj)
+gene_hits_bac <- filter(gene_hits_bac,gene_hits_bac$adj.p != 0)
+
+theme_set(theme_llm(base_size = 12,legend = "right"))
+ggplot(gene_hits_bac, aes(x=logor, y=logpadj, colour=logpadj, size=abs(logor), label=label)) +
+  geom_point(alpha=0.5) +
+  geom_text_repel(
+    data = subset(gene_hits_bac, label != ""),  # 
+    aes(label = label),
+    box.padding = 0.1,          # 
+    segment.alpha = 0.5,
+    min.segment.length = 0.2,
+    max.overlaps = 50,         # 
+    size = 3,
+    segment.color = "grey50",    # 
+    color='black')+
+  geom_hline(yintercept = 1.3,           # 
+             linetype = "dashed",      # 
+             color = "grey50",            # 
+             linewidth = 1)+
+  xlim(c(-10,40))+
+  ylim(c(0,8))+
+  xlab(expression(Log[10]~"Odds Ratio"))+
+  ylab(expression(-Log[10] ~ "FDR") )+
+  scale_color_gradient(limits = c(0, 10))+
+   ggtitle("Bacterial Hosts")
+```
+## Diversity of AMGs from different Animals and Locations
+
+### PcoA analysis of AMGs
+```{r PcoA,warning=FALSE,message=FALSE}
+
+#points = as.data.frame(pcoa$points) 
+points <- read.csv("../Pre-processed_Files/AMG_PcoA_bray_point.csv",header = T,row.names = 1)
+Group1 <- read.table("../Pre-processed_Files/AMG_Group1.txt",header = T,sep = "\t")
+Group1 <- column_to_rownames(Group1,"sample_id")
+points <- merge(points,Group1, by = "row.names")
+colnames(points) <- c("sample_id","V1","V2","V3","location","Species","Source")
+#points$Source=Group1$V2
+#points$location=Group1$V3
+#points$Class=Group1$V4
+# wascores()
+#spe.wa <- wascores(pcoa$points, spe)
+load("../Pre-processed_Files/AMG_pcoa.RData")
+eig = pcoa$eig
+
+theme_set(theme_llm(base_size = 12,margin=FALSE))
+ggplot(points, aes(x=V1, y=V2, colour=Source))+geom_point(alpha=0.7, size=1)+
+  scale_color_manual(
+    values = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD"))+
+  #scale_shape_manual(
+  #  values = c("Asia"= 16,"Europe"=17,"North America"=18,"Oceania"=19)
+#  )+
+  stat_ellipse()+
+  labs(x = paste("PCoA 1 (", format(100*pcoa$eig[1] / sum(pcoa$eig), digits = 4), "%)",sep = ""), 
+       y = paste("PCoA 2 (", format(100*pcoa$eig[2] / sum(pcoa$eig), digits = 4), "%)",sep = ""))
+
+ggplot(points, aes(x=V1, y=V2, colour=location))+geom_point(alpha=0.7, size=1)+
+  scale_color_manual(
+    values = c("Asia"="#FB8072","Europe"="#BEBADA","North America"="#FDB462","Oceania"="#80B1D3"))+
+  stat_ellipse()+
+  labs(x = paste("PCoA 1 (", format(100*pcoa$eig[1] / sum(pcoa$eig), digits = 4), "%)",sep = ""), 
+       y = paste("PCoA 2 (", format(100*pcoa$eig[2] / sum(pcoa$eig), digits = 4), "%)",sep = ""))
+
+```
+
+```{r NMDC,message=FALSE,warning=FALSE}
+
+
+#NMDSpoints1=as.data.frame(NMDS1$points)
+NMDSpoints1 <- read.csv("../Pre-processed_Files/AMG_NMDSpoints1.csv",header = T,row.names = 1)
+head(NMDSpoints1)
+
+
+#Species1=NMDS1$species
+#head(Species1)
+
+
+
+library(tidyverse)
+Group1 <- read.table("../Pre-processed_Files/AMG_Group1.txt",header = T,sep = "\t")
+Group1 <- column_to_rownames(Group1,"sample_id")
+NMDSpoints1 <- merge(NMDSpoints1,Group1, by = "row.names")
+colnames(NMDSpoints1) <- c("sample_id","NDS1","NDS2","location","Species","Source")
+theme_set(theme_llm(base_size = 12,margin=FALSE))
+#NMDS AMG
+ggplot(NMDSpoints1, aes(x=NDS1, y=NDS2, colour=Source))+geom_point(alpha=0.7, size=1)+
+  scale_color_manual(values = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD"))+
+  stat_ellipse()+
+  xlab("NMDS1")+
+  ylab("NMDS2")
+
+ggplot(NMDSpoints1, aes(x=NDS1, y=NDS2, colour=location))+geom_point(alpha=0.7, size=1)+
+  scale_color_manual(values = c("Asia"="#FB8072","Europe"="#BEBADA","North America"="#FDB462","Oceania"="#80B1D3"))+
+  stat_ellipse()+
+  xlab("NMDS1")+
+  ylab("NMDS2")
+
+```
+
+
+## Bubble plot of KEGG enrichment analysis
+
+```{r KEGG,warning=FALSE,message=FALSE}
+setwd("~/DAGPD/Scripts/")
+data1 <- read.csv("../Pre-processed_Files/AMG_KEGG_ClassI.csv",header = T)
+# 绘制气泡图
+theme_set(theme_llm(base_size = 12,legend = "right"))
+data1$Category <- factor(data1$Category,levels = rev(c("Carbohydrate metabolism",
+                                                   "Glycan biosynthesis and metabolism",
+                                                   "Metabolism of terpenoids and polyketides",
+                                                   "Metabolism of cofactors and vitamins",
+                                                   "Energy metabolism",
+                                                   "Lipid metabolism",
+                                                   "Amino acid metabolism",
+                                                   "Metabolism of other amino acids",
+                                                   "Protein families: metabolism",
+                                                   "Cellular community",
+                                                   "Signal transduction",
+                                                   "Translation"
+                                                   )))
+category_colors <- data.frame(
+  Category = rev(c("Carbohydrate metabolism",
+                   "Glycan biosynthesis and metabolism",
+                   "Metabolism of terpenoids and polyketides",
+                   "Metabolism of cofactors and vitamins",
+                   "Energy metabolism",
+                   "Lipid metabolism",
+                   "Amino acid metabolism",
+                   "Metabolism of other amino acids",
+                   "Protein families: metabolism",
+                   "Cellular community",
+                   "Signal transduction",
+                   "Translation"
+  )),
+  Color = c("#A5A5A5","#A5A5A5","#A5A5A5","#A5A5A5","#E4B8ED","#E4B8ED","#F8B535","#4E76BB","#9767C7","#C8EDF7","#AEE57C","#8DD3C7")
+)
+
+ggplot() +
+  geom_tile(data = category_colors, aes(x = 0, y = Category, fill = Color), width = 0.2, height = 1)+
+  scale_fill_identity() +
+  geom_point(data=data1, aes(x = Group, y = Category, size = Enrichfactor, color = logp))+ #geom_point(data = data, aes(x = Group, y = Category, size = Size, color = Color), alpha = 0.7) +
+  geom_point(alpha = 0.8) +  # transparent
+  scale_x_discrete(expand = expansion(mult = c(0, 0.5))) +
+  scale_size_continuous(name = "Enrichment Factor", 
+                        range = c(1, 6),  # bubble size
+                        breaks = seq(1, 5, by = 1)) +  # 
+  scale_color_viridis(name = "-log10(p-value)", 
+                      option = "viridis",  # color
+                      direction = -1) +  # color direction
+  labs(x = "Group", y = "Category", 
+       title = "Bubble Chart by Animals")+theme(aspect.ratio=2)+
+  theme(
+    axis.text.y = element_text(margin = margin(r = 0))  # right margin
+  )
+
+
+```
+
+```{r,warning=FALSE,message=FALSE}
+# class2
+data2 <- read.csv("../Pre-processed_Files/AMG_KEGG_Class2.csv",header = T)
+
+data2$Category <- factor(data2$Category,levels = rev(c("Glycolysis / Gluconeogenesis",
+                                                   "Pentose phosphate pathway",
+                                                   "Pyruvate metabolism",
+                                                   "Starch and sucrose metabolism",
+                                                   "Benzoate degradation",
+                                                   "Fructose and mannose metabolism",
+                                                   "Peptidoglycan biosynthesis and degradation proteins",
+                                                   "Polyketide sugar unit biosynthesis",
+                                                   "One carbon pool by folate",
+                                                   "Vitamin B6 metabolism",
+                                                   "Glycerophospholipid metabolism",
+                                                   "Phenylalanine, tyrosine and tryptophan biosynthesis"
+                                                   )))
+category_colors <- data.frame(
+  Category = c("Glycolysis / Gluconeogenesis",
+               "Pentose phosphate pathway",
+               "Pyruvate metabolism",
+               "Starch and sucrose metabolism",
+               "Benzoate degradation",
+               "Fructose and mannose metabolism",
+               "Peptidoglycan biosynthesis and degradation proteins",
+               "Polyketide sugar unit biosynthesis",
+               "One carbon pool by folate",
+               "Vitamin B6 metabolism",
+               "Glycerophospholipid metabolism",
+               "Phenylalanine, tyrosine and tryptophan biosynthesis"
+  ),
+  Color = c("#8DD3C7","#8DD3C7","#8DD3C7","#8DD3C7","#8DD3C7","#8DD3C7","#AEE57C","#C8EDF7","#9767C7","#9767C7","#F8B535","#E4B8ED"))
+
+
+theme_set(theme_llm(base_size = 12,legend = "left"))
+ggplot() +
+  geom_tile(data = category_colors, aes(x = 4, y = Category, fill = Color), width = 0.2, height = 1)+
+  scale_fill_identity() +
+  geom_point(data=data2, aes(x = Group, y = Category, size = Enrichfactor, color = logp))+ #geom_point(data = data, aes(x = Group, y = Category, size = Size, color = Color), alpha = 0.7) +
+  geom_point(alpha = 0.8) +  # 
+  scale_x_discrete(expand = expansion(mult = c(0.2, 0))) +
+  scale_y_discrete(position = "right") +
+  scale_size_continuous(name = "Enrichment Factor", 
+                        range = c(1, 4.5),  # 
+                        breaks = seq(1, 5, by = 1))+  # 
+  scale_color_viridis(name = "-log10(p-value)", 
+                      option = "viridis",  # 
+                      limits = c(0, 16),
+                      direction = -1) +  # 
+  labs(x = "Group", y = "Category", 
+       title = "Bubble Chart by Animals subclass")+theme(aspect.ratio=2)+
+  theme(
+    axis.text.y = element_text(margin = margin(r = 0))  # 
+  )
+
+
+
+```
+
+
+
+## A bar plot showing alpha diversity of CAZy in phages among domestic animals
+
+```{r,warning=FALSE,message=FALSE}
+
+library(tidyverse)
+source("./theme_llm.R")
+
+cazy_alpha <- read.table("../Pre-processed_Files/AMG_cazy.txt",header = T)
+cazy_alpha$Category <- factor(cazy_alpha$Category,
+                              levels = rev(unique(cazy_alpha$Category)))
+theme_set(theme_llm(base_size = 16,legend = "right"))
+ggplot()+geom_col(data=cazy_alpha,mapping = aes(x=Sources,y=Counts,fill=Category),
+                  width=0.5)+scale_fill_brewer(palette = "Set3")+
+  ylab("Cazymes Diversity")+
+  xlab("Animal Hosts")+
+  ylim(0,810)
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+```{r,warning=FALSE,message=FALSE}
+# cazy <- read.table("../Pre-processed_Files/AMG_cazy_relative.txt",header = T)
+# cazy$Category <- factor(cazy$Category,levels = rev(unique(cazy$Category)))
+# theme_set(theme_llm(base_size = 16,legend = "right"))
+# ggplot()+geom_col(data=cazy,mapping = aes(x=Sources,y=Counts/Ratio,fill=Category),
+#                   width=0.5)+scale_fill_brewer(palette = "Set3")+
+#   ylab("Cazymes per 1000 genes")+
+#   xlab("Animal Hosts")+
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+## A bar plot showing COG annotation in different domestic animals
+```{r,message=FALSE,echo=FALSE}
+COG <- read.table("../Pre-processed_Files/COG_res.txt",header = T)
+ggplot(COG, aes(x=COG, y=log(number,2), fill=Species)) + 
+  geom_bar(stat = 'identity',position="dodge",alpha = 0.7)+
+  labs(y = expression(paste("Number of Proteins (",x10^3, ")")),x=NULL)+
+   scale_color_manual(values  = c("Chicken"="#FFBC00",
+                                 "Pig"="#E588A6",
+                                 "Ruminant"="#0AC5AD"),
+                     aesthetics = c("fill"))
+```
