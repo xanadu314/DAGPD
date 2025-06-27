@@ -1,0 +1,357 @@
+---
+title: "Cophylogeny  of phages with their animal hosts"
+author: "Yuxuan Huang"
+format: 
+  html:
+    embed-resources: true
+---
+# Host filter plot
+```{r,message=FALSE,warning=FALSE}
+.libPaths("/home/lsx/R/x86_64-pc-linux-gnu-library/4.4/")
+library(dplyr)
+library(tibble)
+library(tidyr)
+library(readr)
+library(purrr)
+library(ggplot2)
+library(paco)   
+
+load("../Pre-processed_Files/combine_amg.RData")
+abun <- as.data.frame(combined_amg)
+meta <- read.table("../Pre-processed_Files/AMG_Group1.txt",sep = "\t",header = T)      # two cols：Sample, Host
+meta =meta[,c(1,4)]
+colnames(meta) <- c("Sample","Host")
+host_vec <- c("Chicken", "Pig", "Ruminant")
+
+abun <- abun %>% tibble::rownames_to_column("Sample")   
+long <- abun %>%
+  pivot_longer(-Sample,
+               names_to  = "AMG",
+               values_to = "Abun") %>%
+  left_join(meta, by = "Sample")
+#cal AMG mean
+avg_host <- long %>%
+  group_by(AMG, Host) %>%
+  summarise(Mean = mean(Abun), .groups = "drop") %>%
+  pivot_wider(names_from = Host, values_from = Mean, values_fill = 0)
+
+#Fisher exactly test with FDR
+################################################################################
+appear <- long %>%
+  mutate(Present = Abun > 0) %>%
+  group_by(AMG, Host) %>%
+  summarise(present = sum(Present),
+            absent  = n() - present, .groups = "drop")
+
+enrich <- map_dfr(host_vec, function(h){
+  other <- setdiff(host_vec, h)
+  tmp <- appear %>%
+    group_by(AMG) %>%
+    summarise(a = present[Host == h],
+              b = absent [Host == h],
+              c = sum(present[Host %in% other]),
+              d = sum(absent [Host %in% other]),
+              .groups = "drop") %>%
+    mutate(p   = map2_dbl(a, c, \(x,y)
+                          fisher.test(matrix(c(x,b[1],y,d[1]), 2))$p.value),
+           Host = h)
+})
+enrich <- enrich %>% group_by(Host) %>% mutate(q = p.adjust(p, "BH")) %>% ungroup()
+
+#cal Preference (Bias)，and significant AMG
+################################################################################
+bias_tab <- avg_host %>%
+  pivot_longer(-AMG, names_to = "Host", values_to = "HostMean") %>%
+  group_by(AMG) %>%
+  mutate(OtherMean = (sum(HostMean) - HostMean)/(length(host_vec)-1)) %>%
+  ungroup() %>%
+  mutate(Bias = (HostMean - OtherMean) /
+           (HostMean + OtherMean + 1e-6))          # not 0/0
+
+bias_sig <- bias_tab %>%
+  left_join(enrich %>% select(AMG, Host, q), by = c("AMG","Host")) %>%
+  filter(q < 0.05)
+
+bias_sig_pos <- bias_sig %>% 
+  filter(Bias>0)
+
+bias_sig_pos$AMG_name <- gsub(pattern = "AMG_","", bias_sig_pos$AMG)
+contig_AMG <- read.table("../Pre-processed_Files/contig_AMG.txt",header = T)
+bias_sig_pos_contig_AMG <- merge(bias_sig_pos,contig_AMG,by="AMG_name")
+VC_contig <- read.table("../Pre-processed_Files/VC_contig.txt",header = T)
+bias_sig_pos_contig_AMG_VC <- merge(bias_sig_pos_contig_AMG,VC_contig,by="contig")
+
+vc_max <- bias_sig_pos_contig_AMG_VC %>%                     
+  group_by(VC) %>%                   
+  summarise(mean_Bias = max(Bias, na.rm = TRUE))  
+
+bias_sig_pos_contig_AMG_VC_R2ratio <- bias_sig_pos_contig_AMG_VC %>% 
+  mutate(R2ratio = case_when(
+    Host == "Ruminant" ~ 0.15043 / 0.05888,   # ≈ 2.553
+    Host == "Pig"      ~ 0.17743 / 0.06976,   # ≈ 2.543
+    Host == "Chicken"  ~ 0.15927 / 0.08097,   # ≈ 1.968
+    TRUE               ~ NA_real_            # 
+  ))
+bias_sig_pos_contig_AMG_VC_R2ratio <- bias_sig_pos_contig_AMG_VC_R2ratio %>% 
+  group_by(VC) %>% 
+  mutate(R2ratiomean = mean(R2ratio, na.rm = TRUE)) %>%  
+  ungroup()                                     
+
+bias_sig_pos_contig_AMG_VC_R2ratio <- bias_sig_pos_contig_AMG_VC_R2ratio %>% 
+  group_by(VC) %>% 
+  mutate(Biasmean = mean(Bias, na.rm = TRUE)) %>%  
+  ungroup() 
+VC_contig_host <- read.table("../Pre-processed_Files/VC_contig_host.txt",header = T)
+
+VC_host <- VC_contig_host %>% select(VC,Host) 
+VC_host <- filter(VC_host,Host!="Human")
+top_host <- VC_host %>% 
+  count(VC, Host, name = "n") %>%         # cal VC × Host number
+  group_by(VC) %>%                       
+  slice_max(order_by = n, n = 1,          # keep largest number
+            with_ties = FALSE) %>%        # 
+  ungroup()                               # 
+top_host=top_host[,c(1,2)]
+colnames(top_host)=c("VC","Host2")
+
+bias_sig_pos_contig_AMG_VC_R2ratio <- merge(top_host,bias_sig_pos_contig_AMG_VC_R2ratio,by="VC")
+# AMG_K00560 remove
+bias_sig_pos_contig_AMG_VC_R2ratio <- filter(bias_sig_pos_contig_AMG_VC_R2ratio,AMG !="AMG_K00560")
+#bias_sig_pos_contig_AMG_VC_R2ratio <- bias_sig_pos_contig_AMG_VC_R2ratio %>% 
+ # group_by(VC) %>% 
+ # mutate(Biasmean = mean(Bias, na.rm = TRUE)) %>%  # 组内求均值
+  #ungroup() 
+
+# bias_sig_pos_contig_AMG_VC_R2ratio2 <- merge(top_host,bias_sig_pos_contig_AMG_VC_R2ratio,by="VC")
+
+VC_host_bias_R2ratio <- bias_sig_pos_contig_AMG_VC_R2ratio %>% 
+  select(Host2,Biasmean, VC, R2ratiomean) %>%   # 
+  distinct()   
+
+co_vc <- c(
+  "VC559","VC1000", "VC4559",
+  "VC2030", "VC2992",
+  "VC4093", "VC2511"
+)
+
+VC_host_bias_R2ratio_filter2 <- VC_host_bias_R2ratio %>% 
+  mutate(Cophylo = ifelse(VC %in% co_vc, "cophylogeny", "not cophylogeny"))
+set.seed(123)
+library(ggrepel)
+
+ggplot(VC_host_bias_R2ratio_filter2, aes(x = R2ratiomean, y = Biasmean, colour = Host2,shape = Cophylo,size = Cophylo)) +
+  geom_jitter(width = 0.2, height = 0,      # jitter
+ alpha = 0.7)+
+    scale_size_manual(values  = c("not cophylogeny" = 2,       # 
+                                  "cophylogeny" = 5),  # 
+                      guide = "none")+
+  scale_color_manual(
+    values = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD")) +          
+  geom_text_repel(
+    data = subset(VC_host_bias_R2ratio_filter2,
+                  Cophylo == "cophylogeny"),
+    aes(label = VC),             # label
+    colour = "black",            # word color
+    size   = 3.3,                # word size
+    max.overlaps = Inf,          # overlap
+    box.padding  = 0.3,          # padding
+    point.padding= 0.3,
+    segment.colour = "grey60"    # line color
+  ) +
+  labs(
+    x = "R²_host / R²_geo (R2ratio)",
+    y = "Animal Host Preference",
+    colour = "Host"
+  ) +
+  theme_classic(base_size = 14) +                  # 
+  theme(
+    legend.position = "right",
+    legend.title    = element_text(face = "bold")
+  )+xlim(c(1,3))+ylim(0.5,1.1)
+
+
+
+```
+
+# Similarity of Clec2 domain and Ig-like domain in different animals
+
+## Clec2 domain
+
+```{r,message=FALSE,warning=FALSE}
+
+library(tidyverse)
+source("./theme_llm.R")
+
+mat <- read.table("../Pre-processed_Files/Clec2_matrix.txt",header = T)
+library(pheatmap,lib.loc = "/home/lsx/R/x86_64-pc-linux-gnu-library/4.4/")
+pheatmap::pheatmap(mat,border_color = NA,
+                   clustering_method = "ward.D2",
+                   treeheight_row=100,
+                   treeheight_col=100)
+```
+
+## Ig-like domain
+
+```{r,message=FALSE,warning=FALSE}
+mat <- read.table("../Pre-processed_Files/Ig1_matrix.txt",header = T)
+library(pheatmap)
+pheatmap::pheatmap(mat,border_color = NA,
+                   clustering_method = "ward.D2",
+                   treeheight_row=100,
+                   treeheight_col=100)
+```
+
+# Distribution of Ig-like and Flg_new domains in phages from different databases.
+
+## Ig-like domains
+
+```{r,message=FALSE,warning=FALSE}
+igdomain <- read.csv("../Pre-processed_Files/igdomain.csv",header = T)
+library(ggsignif)
+source("theme_llm.R")
+library(ggplot2)
+
+comparisons <- list(c("DAGPD", "GPD"),c("GPD", "Hunter"),c("DAGPD","Hunter"))
+theme_set(theme_llm(base_size = 16,legend = "none"))
+p1 <- ggplot(igdomain, aes(x = Database, y = Value,color=Database)) +
+  #geom_boxplot(size=0.5)+ 
+  scale_color_manual(values  = c("DAGPD"="#6E40AA","GPD"="#AFF05B",
+                                 "Hunter"="#00BFFF"))+
+  
+  stat_boxplot(geom ='errorbar', width = 0.3) +
+  
+  geom_jitter(aes(color=Database), size=2, alpha=0.7, width = 0.2)+
+  geom_signif(
+    comparisons = comparisons, test = "t.test",
+    map_signif_level = FALSE, textsize = 4,
+    step_increase = 0.1,color="black"
+  )+
+  geom_violin(aes(fill = Database),color= 'grey',scale= 'width',linewidth= 0.8, 
+              trim= TRUE,alpha= 0.7)+
+  scale_fill_manual(values  = c("DAGPD"="#6E40AA","GPD"="#AFF05B","Hunter"="#00BFFF"))+
+theme(aspect.ratio=1)+
+ylab("Number of Ig-like domains in phages")+
+  xlab("")+
+  theme(legend.title=element_blank())
+p1
+```
+
+## flg_new domains
+
+```{r,message=FALSE,warning=FALSE}
+flg_new <- read.csv("../Pre-processed_Files/flg_new.csv",header = T)
+p2 <- ggplot(flg_new, aes(x = Database, y = Value,color=Database)) +
+  #geom_boxplot(size=0.5)+ 
+  scale_color_manual(values  = c("DAGPD"="#6E40AA","GPD"="#AFF05B","Hunter"="#00BFFF"))+
+  
+  stat_boxplot(geom ='errorbar', width = 0.3) +
+  
+  geom_jitter(aes(color=Database), size=2, alpha=0.7, width = 0.2)+
+  geom_signif(
+    comparisons = comparisons, test = "t.test",
+    map_signif_level = FALSE, textsize = 4,
+    step_increase = -0.2,color="black",y_position = c(50,55,60)
+  )+
+  geom_violin(aes(fill = Database),color= 'grey',scale= 'width',linewidth= 0.8, trim= TRUE,alpha= 0.7)+
+  scale_fill_manual(values  = c("DAGPD"="#6E40AA","GPD"="#AFF05B","Hunter"="#00BFFF"))+
+  theme(aspect.ratio=1)+
+  ylab("Number of Flg_new domians in phages")+
+  xlab("")+
+  theme(legend.title=element_blank())+ylim(0,60)
+p2
+
+flg_new_DAGPD <- filter(flg_new,Database=="DAGPD"|Database=="GPD")
+library(tidyverse)
+flg_new_DAGPD <- flg_new_DAGPD %>%
+  mutate(Database2 = case_when(
+    str_detect(contigid, "chick") ~ "Chicken",
+    str_detect(contigid, "pig") ~ "Pig",
+    str_detect(contigid, "uvig|ivig") ~ "Human",
+    TRUE ~ "Ruminant"
+  ))
+
+comparisons3=list(c("Chicken", "Pig"),c("Pig", "Ruminant"), c("Chicken", "Ruminant"),c("Pig","Human"),c("Ruminant","Human"),c("Chicken","Human"))
+
+flg_new_DAGPD <- filter(flg_new,Database=="DAGPD"|Database=="GPD")
+library(tidyverse)
+flg_new_DAGPD <- flg_new_DAGPD %>%
+  mutate(Database2 = case_when(
+    str_detect(contigid, "chick") ~ "Chicken",
+    str_detect(contigid, "pig") ~ "Pig",
+    str_detect(contigid, "uvig|ivig") ~ "Human",
+    TRUE ~ "Ruminant"
+  ))
+flg_new_DAGPD$Database2 <- factor(flg_new_DAGPD$Database2,
+                                  levels = c("Chicken","Pig","Ruminant","Human"))
+comparisons3=list(c("Chicken", "Pig"),c("Pig", "Ruminant"), c("Chicken", "Ruminant"),c("Pig","Human"),c("Ruminant","Human"),c("Chicken","Human"))
+
+p3 <- ggplot(flg_new_DAGPD, aes(x = Database2, y = Value,color=Database2)) +
+  #geom_boxplot(size=0.5)+ 
+  scale_color_manual(values  = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD","Human"="#3FAAE2"))+
+  
+  stat_boxplot(geom ='errorbar', width = 0.3) +
+  
+  geom_jitter(aes(color=Database2), size=2, alpha=0.7, width = 0.2)+
+  geom_signif(
+    comparisons = comparisons3, test = "t.test",
+    map_signif_level = FALSE, textsize = 4,
+    step_increase = 0.1,color="black"
+  )+
+  #geom_violin(aes(fill = Database),color= 'grey',scale= 'width',linewidth= 0.8, trim= TRUE,alpha= 0.7)+
+  scale_fill_manual(values  = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD","Human"="#3FAAE2"))+
+  theme(aspect.ratio=1)+
+  geom_boxplot(alpha=0.7)+
+  ylab("Number of Flg_new domians in phages")+
+  xlab("")
+  #theme(legend.title=element_blank())+ylim(0,60)
+p3
+
+chick_num <- c(72/(72+5066))
+pig_num <- c(110/(110+7388))
+cow_num <- c(1369/(1369+37116))
+
+flg_new_ratio <- df <- data.frame(
+  category = c("Chicken", "Pig", "Ruminant"),
+  value = c(0.01401323, 0.01467058, 0.0355723)
+)
+my_colors <- c("Chicken" = "#FFBC00",  
+               "Pig"   = "#E588A6",  
+               "Ruminant"   = "#0AC5AD")  
+library(scales)
+p4 <- ggplot(flg_new_ratio, aes(x = category, y = value,fill = category)) +
+  geom_bar(stat = "identity",width = 0.6)+
+  theme(aspect.ratio=1)+
+  scale_fill_manual(values  = c("Chicken" = "#FFBC00",  
+                                "Pig"   = "#E588A6",  
+                                "Ruminant"   = "#0AC5AD"))+
+  geom_text(aes(label = percent(value, accuracy = 0.1)), 
+            vjust = -0.5, size = 5)+  
+  scale_y_continuous(labels = percent_format(accuracy = 0.1),
+                     limits = c(0, 0.04))+
+  ylab("Flg_new Domains Ratio")+
+  xlab("")
+p4
+
+flg_new_abu <- read.csv("../Pre-processed_Files/flg_new_abundance.csv",header = T)
+
+comparisons2=list(c("Chicken", "Pig"),c("Pig", "Ruminant"), c("Chicken", "Ruminant"))
+p5 <- ggplot(flg_new_abu, aes(x = Species, y = Value,color=Species)) +
+  geom_boxplot(size=0.5) +
+  scale_color_manual(values  = c("Chicken"="#FFBC00","Pig"="#E588A6","Ruminant"="#0AC5AD"))+
+  stat_boxplot(geom ='errorbar', width = 0.3) +
+  geom_jitter(aes(color=Species), size=2, alpha=0.7, width = 0.2)+
+  geom_signif(
+    comparisons = comparisons2, test = "t.test",
+    map_signif_level = FALSE, textsize = 4,
+    step_increase = 0.1,color="black"
+  )+
+  #geom_violin(aes(fill = Database),color= 'grey',scale= 'width',linewidth= 0.8, trim= TRUE,alpha= 0.7)+
+  #scale_fill_manual(values  = c("DAGPD"="#6E40AA","GPD"="#AFF05B","Hunter"="#00BFFF"))+
+  theme(aspect.ratio=1)+
+  ylab("TPM")+
+  xlab("")+
+  theme(legend.title=element_blank())
+p5
+
+
+```
